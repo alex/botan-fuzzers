@@ -1,0 +1,70 @@
+diff --git a/src/lib/cert/x509/x509_obj.cpp b/src/lib/cert/x509/x509_obj.cpp
+index 4dae686..f1b6e32 100644
+--- a/src/lib/cert/x509/x509_obj.cpp
++++ b/src/lib/cert/x509/x509_obj.cpp
+@@ -197,9 +197,13 @@ bool X509_Object::check_signature(const Public_Key& pub_key) const
+       Signature_Format format =
+          (pub_key.message_parts() >= 2) ? DER_SEQUENCE : IEEE_1363;
+ 
++#if 0
+       PK_Verifier verifier(pub_key, padding, format);
+ 
+       return verifier.verify_message(tbs_data(), signature());
++#else
++      return true;
++#endif
+       }
+    catch(std::exception& e)
+       {
+diff --git a/src/lib/tls/msg_cert_verify.cpp b/src/lib/tls/msg_cert_verify.cpp
+index 74565e2..5224449 100644
+--- a/src/lib/tls/msg_cert_verify.cpp
++++ b/src/lib/tls/msg_cert_verify.cpp
+@@ -84,9 +84,13 @@ bool Certificate_Verify::verify(const X509_Certificate& cert,
+    std::pair<std::string, Signature_Format> format =
+       state.understand_sig_format(*key.get(), m_hash_algo, m_sig_algo);
+ 
++#if 0
+    PK_Verifier verifier(*key, format.first, format.second);
+ 
+    return verifier.verify_message(state.hash().get_contents(), m_signature);
++#else
++   return true;
++#endif
+    }
+ 
+ }
+diff --git a/src/lib/tls/msg_finished.cpp b/src/lib/tls/msg_finished.cpp
+index b837172..69a316f 100644
+--- a/src/lib/tls/msg_finished.cpp
++++ b/src/lib/tls/msg_finished.cpp
+@@ -76,7 +76,11 @@ Finished::Finished(const std::vector<byte>& buf)
+ bool Finished::verify(const Handshake_State& state,
+                       Connection_Side side) const
+    {
++#if 0
+    return (m_verification_data == finished_compute_verify(state, side));
++#else
++   return finished_compute_verify(state, side).size() == m_verification_data.size();
++#endif
+    }
+ 
+ }
+diff --git a/src/lib/tls/tls_client.cpp b/src/lib/tls/tls_client.cpp
+index 82630b7..2e642df 100644
+--- a/src/lib/tls/tls_client.cpp
++++ b/src/lib/tls/tls_client.cpp
+@@ -394,11 +394,13 @@ void Client::process_handshake_msg(const Handshake_State* active_state,
+          {
+          const Public_Key& server_key = state.get_server_public_Key();
+ 
++#if 0
+          if(!state.server_kex()->verify(server_key, state))
+             {
+             throw TLS_Exception(Alert::DECRYPT_ERROR,
+                                 "Bad signature on server key exchange");
+             }
++#endif
+          }
+       }
+    else if(type == CERTIFICATE_REQUEST)
