@@ -1,5 +1,5 @@
 diff --git a/src/lib/cert/x509/x509_obj.cpp b/src/lib/cert/x509/x509_obj.cpp
-index 4dae686..f1b6e32 100644
+index e908e8c..93bd62d 100644
 --- a/src/lib/cert/x509/x509_obj.cpp
 +++ b/src/lib/cert/x509/x509_obj.cpp
 @@ -197,9 +197,13 @@ bool X509_Object::check_signature(const Public_Key& pub_key) const
@@ -14,10 +14,23 @@ index 4dae686..f1b6e32 100644
 +      return true;
 +#endif
        }
-    catch(std::exception& e)
+    catch(std::exception&)
        {
+diff --git a/src/lib/pubkey/rsa/rsa.cpp b/src/lib/pubkey/rsa/rsa.cpp
+index 57fab94..205e94c 100644
+--- a/src/lib/pubkey/rsa/rsa.cpp
++++ b/src/lib/pubkey/rsa/rsa.cpp
+@@ -49,6 +49,8 @@ RSA_PrivateKey::RSA_PrivateKey(RandomNumberGenerator& rng,
+ */
+ bool RSA_PrivateKey::check_key(RandomNumberGenerator& rng, bool strong) const
+    {
++   return true;
++
+    if(!IF_Scheme_PrivateKey::check_key(rng, strong))
+       return false;
+ 
 diff --git a/src/lib/tls/msg_cert_verify.cpp b/src/lib/tls/msg_cert_verify.cpp
-index 74565e2..5224449 100644
+index be6c8a0..58f9a93 100644
 --- a/src/lib/tls/msg_cert_verify.cpp
 +++ b/src/lib/tls/msg_cert_verify.cpp
 @@ -84,9 +84,13 @@ bool Certificate_Verify::verify(const X509_Certificate& cert,
@@ -51,7 +64,7 @@ index b837172..69a316f 100644
  
  }
 diff --git a/src/lib/tls/tls_client.cpp b/src/lib/tls/tls_client.cpp
-index 82630b7..2e642df 100644
+index 623a522..00c033f 100644
 --- a/src/lib/tls/tls_client.cpp
 +++ b/src/lib/tls/tls_client.cpp
 @@ -394,11 +394,13 @@ void Client::process_handshake_msg(const Handshake_State* active_state,
