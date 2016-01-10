@@ -1,7 +1,9 @@
 *.log
+
+/libFuzzer
 libFuzzer.a
 
-snapshot-*.tar.gz
-libFuzzer
-botan-master
-
+/output
+/botan
+/bin
+callgrind.out.*

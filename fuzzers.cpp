@@ -1,6 +1,7 @@
 
-#ifndef BOTAN_FUZZER_ENTROPY_POINTS_H__
-#define BOTAN_FUZZER_ENTROPY_POINTS_H__
+#if !defined(FUZZER_POINT)
+  #error "FUZZER_POINT must be set as macro on build line"
+#endif
 
 #include <botan/x509cert.h>
 #include <botan/x509_crl.h>
@@ -19,7 +20,7 @@
 
 using namespace Botan;
 
-inline int fuzz_p256(const uint8_t in[], size_t len)
+int fuzz_redc_p256(const uint8_t in[], size_t len)
    {
    if(len > 64)
       return 0;
@@ -34,14 +35,11 @@ inline int fuzz_p256(const uint8_t in[], size_t len)
    Botan::Modular_Reducer p_redc(p);
 
    const Botan::BigInt v1 = x % p;
-   //std::cout << "v1 " << v1 << "\n";
    const Botan::BigInt v2 = p_redc.reduce(x);
-   //std::cout << "v2 = " << v2 << "\n";
 
    Botan::BigInt v3 = x;
    Botan::secure_vector<Botan::word> ws;
    Botan::redc_p256(v3, ws);
-   //std::cout << "v3 = " << v3 << "\n";
 
    if(v1 != v2 || v2 != v3)
       {
@@ -51,7 +49,7 @@ inline int fuzz_p256(const uint8_t in[], size_t len)
    return 0;
    }
 
-inline int fuzz_p384(const uint8_t in[], size_t len)
+int fuzz_redc_p384(const uint8_t in[], size_t len)
    {
    if(len > 96)
       return 0;
@@ -59,6 +57,7 @@ inline int fuzz_p384(const uint8_t in[], size_t len)
    Botan::BigInt x = Botan::BigInt::decode(in, len);
 
    const BigInt& p = Botan::prime_p384();
+   const BigInt p2 = p*p;
 
    if(x >= p*p)
       return 0;
@@ -66,14 +65,11 @@ inline int fuzz_p384(const uint8_t in[], size_t len)
    Botan::Modular_Reducer p_redc(p);
 
    const Botan::BigInt v1 = x % p;
-   //std::cout << "v1 " << v1 << "\n";
    const Botan::BigInt v2 = p_redc.reduce(x);
-   //std::cout << "v2 = " << v2 << "\n";
 
    Botan::BigInt v3 = x;
    Botan::secure_vector<Botan::word> ws;
    Botan::redc_p384(v3, ws);
-   //std::cout << "v3 = " << v3 << "\n";
 
    if(v1 != v2 || v2 != v3)
       {
@@ -83,48 +79,55 @@ inline int fuzz_p384(const uint8_t in[], size_t len)
    return 0;
    }
 
-inline int fuzz_ecc_points(const uint8_t in[], size_t len)
+int fuzz_ecc_points(const char* group_name, size_t group_size,
+                    const uint8_t in[], size_t len)
    {
-   if(len % 2 != 0 || len > 2*(256/8))
+   if(len % 2 != 0 || len > (2*group_size)/8)
       return 0;
 
-   Botan::EC_Group group("secp256r1");
+   static Botan::EC_Group group(group_name);
 
-   const Botan::PointGFp& base_point = group.get_base_point();
-   const Botan::BigInt& group_order = group.get_order();
-
-   Botan::Blinded_Point_Multiply blind(base_point, group_order, 4);
+   static const Botan::PointGFp& base_point = group.get_base_point();
+   static const Botan::BigInt& group_order = group.get_order();
 
    const Botan::BigInt a = Botan::BigInt::decode(in, len/2);
    const Botan::BigInt b = Botan::BigInt::decode(in + len/2, len/2);
    const Botan::BigInt c = a + b;
 
+#if 0
    const Botan::PointGFp P = base_point * a;
    const Botan::PointGFp Q = base_point * b;
    const Botan::PointGFp R = base_point * c;
 
-   const Botan::PointGFp P1 = blind.blinded_multiply(a, system_rng());
-   const Botan::PointGFp Q1 = blind.blinded_multiply(b, system_rng());
-   const Botan::PointGFp R1 = blind.blinded_multiply(c, system_rng());
-
    const Botan::PointGFp A1 = P + Q;
    const Botan::PointGFp A2 = Q + P;
-
-   if(P1 != P)
-      __builtin_trap();
-
-   if(Q1 != Q)
-      __builtin_trap();
-
-   if(R1 != R)
-      __builtin_trap();
 
    if(A1 != R)
       __builtin_trap();
 
    if(A2 != R)
       __builtin_trap();
+#endif
 
+#if 1
+   Botan::Blinded_Point_Multiply blind(base_point, group_order, 4);
+
+   const Botan::PointGFp P1 = blind.blinded_multiply(a, system_rng());
+   const Botan::PointGFp Q1 = blind.blinded_multiply(b, system_rng());
+   const Botan::PointGFp R1 = blind.blinded_multiply(c, system_rng());
+
+   const Botan::PointGFp S1 = P1 + Q1;
+   const Botan::PointGFp S2 = Q1 + P1;
+
+   if(S1 != R1)
+      __builtin_trap();
+
+   if(S1 != R1)
+      __builtin_trap();
+#endif
+
+
+#if 0
    if(!P.on_the_curve())
       __builtin_trap();
 
@@ -136,11 +139,27 @@ inline int fuzz_ecc_points(const uint8_t in[], size_t len)
 
    if(!A2.on_the_curve())
       __builtin_trap();
+#endif
 
    return 0;
    }
 
-inline int fuzz_bn_square(const uint8_t in[], size_t len)
+int fuzz_ecc_mul_p256(const uint8_t in[], size_t len)
+   {
+   return fuzz_ecc_points("secp256r1", 256, in, len);
+   }
+
+int fuzz_ecc_mul_p384(const uint8_t in[], size_t len)
+   {
+   return fuzz_ecc_points("secp384r1", 384, in, len);
+   }
+
+int fuzz_ecc_mul_p521(const uint8_t in[], size_t len)
+   {
+   return fuzz_ecc_points("secp521r1", 521, in, len);
+   }
+
+int fuzz_bn_square(const uint8_t in[], size_t len)
    {
    Botan::BigInt x = Botan::BigInt::decode(in, len);
 
@@ -155,7 +174,7 @@ inline int fuzz_bn_square(const uint8_t in[], size_t len)
    return 0;
    }
 
-inline int fuzz_cert(const uint8_t in[], size_t len)
+int fuzz_x509_cert(const uint8_t in[], size_t len)
    {
    try
       {
@@ -167,7 +186,7 @@ inline int fuzz_cert(const uint8_t in[], size_t len)
    return 0;
    }
 
-inline int fuzz_crl(const uint8_t in[], size_t len)
+int fuzz_x509_crl(const uint8_t in[], size_t len)
    {
    try
       {
@@ -317,7 +336,7 @@ class Fuzzer_TLS_Client_Creds : public Credentials_Manager
          }
    };
 
-inline int fuzz_tls_client(const uint8_t in[], size_t len)
+int fuzz_tls_client(const uint8_t in[], size_t len)
    {
    if(len == 0)
       return 0;
@@ -369,7 +388,7 @@ inline int fuzz_tls_client(const uint8_t in[], size_t len)
    return 0;
    }
 
-inline int fuzz_tls_server(const uint8_t in[], size_t len)
+int fuzz_tls_server(const uint8_t in[], size_t len)
    {
    if(len == 0)
       return 0;
@@ -426,6 +445,35 @@ inline int fuzz_tls_server(const uint8_t in[], size_t len)
       return 0;
       }
    return 0;
+   }
+
+#if defined(USE_LLVM_FUZZER)
+
+// Called by main() in libFuzzer
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t in[], size_t len)
+   {
+   return FUZZER_POINT(in, len);
+   }
+
+#else
+
+// Read stdin for AFL
+
+#include <stdio.h>
+
+int main(int argc, char* argv[])
+   {
+   std::vector<uint8_t> buf(4096); // max read
+
+#if defined(__AFL_LOOP)
+   while(__AFL_LOOP(1000))
+#endif
+      {
+      size_t got = ::fread(buf.data(), 1, buf.size(), stdin);
+      buf.resize(got);
+      buf.shrink_to_fit();
+      return FUZZER_POINT(buf.data(), got);
+      }
    }
 
 #endif
